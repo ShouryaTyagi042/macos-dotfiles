@@ -35,6 +35,9 @@ brew install sketchybar borders lua
 # SbarLua — the Lua bindings sketchybarrc requires
 git clone https://github.com/FelixKratz/SbarLua.git /tmp/SbarLua \
   && cd /tmp/SbarLua && make install && rm -rf /tmp/SbarLua
+
+# Notchy — Spotify player (not part of this repo, but the bar assumes it)
+brew install --cask vishvavariya/notchy/notchy
 ```
 
 Fonts: SF Pro / SF Mono (`helpers/default_font.lua`) plus `sketchybar-app-font`. To use
@@ -73,9 +76,17 @@ Loom → floating.
 
 Tokyo Night palette, defined once in `colors.lua`. Left side: Apple menu, workspace
 indicator (click the toggle to swap between workspaces and the focused app's menu bar).
-Right side: Spotify, CPU graph, wifi, volume, battery, clock.
+Right side: CPU graph, wifi, volume, battery, clock.
 
-Two items are deliberately not built the way upstream builds them:
+Media is deliberately **not** in the bar — [Notchy](https://notchy.dev) handles Spotify as
+a floating pill (this machine runs clamshell on an external display, so there is no notch
+and Notchy falls back to pill mode). `items/media.lua` and `helpers/spotify.sh` drove it
+over Spotify's AppleScript dictionary before that; they are in git history if Notchy is
+ever dropped. Note that the upstream `media_change` event and `nowplaying-cli` do *not*
+work here at all: macOS 15.4 restricted Apple's private MediaRemote framework to
+first-party apps, and on 26.x it returns null even with a track playing.
+
+One item is deliberately not built the way upstream builds it:
 
 - **`items/spaces.lua` is driven by AeroSpace, not yabai.** It registers the custom
   `aerospace_workspace_change` event that `.aerospace.toml` fires, and clicks run
@@ -83,28 +94,6 @@ Two items are deliberately not built the way upstream builds them:
   workspaces per update. All ten stay visible so the row never shifts; empty ones
   are dimmed rather than hidden.
   Items keep the `space.N` name because `menus.lua` toggles the `/space\..*/` group.
-- **`items/media.lua` drives Spotify over AppleScript**, through `helpers/spotify.sh`.
-  The upstream `media_change` event and `nowplaying-cli` both read Apple's private
-  MediaRemote framework, which was restricted to first-party apps in macOS 15.4 — on
-  26.x it returns null for everything, so the item never drew. AppleScript still works,
-  at the cost of being Spotify-only. The `if application "Spotify" is running` guard is
-  load-bearing: a bare `tell application "Spotify"` would launch Spotify on every poll.
-
-  The cover sits in the bar; clicking it opens a mini-player with album art, title,
-  album, artist, shuffle / prev / play-pause / next / repeat, a seekable scrubber with
-  elapsed and remaining times, and a volume slider. Polling drops from 2s to 1s while
-  the popup is open so the scrubber tracks smoothly.
-
-  Two shape constraints worth knowing before editing it:
-  - **A popup is one row or one column**, never a grid — `popup.horizontal` is a single
-    flag for the whole popup. Hence the wide single row. The three text lines are
-    stacked by giving those items zero width and offsetting their labels vertically,
-    with a spacer item reserving the space they overflow into.
-  - **Image `scale` multiplies source pixels, not a target size.** Spotify serves
-    640x640, so art is resized on disk with `sips` to a known size and always rendered
-    at a fixed scale. Files are cached per track id *and* size under
-    `/tmp/sketchybar-spotify-art/`; SketchyBar caches images by path, so a fixed
-    filename would keep showing the first cover it ever loaded.
 
 ## Conventions
 
