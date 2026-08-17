@@ -17,6 +17,14 @@ local settings = require("settings")
 local POLL_SECONDS = 2
 local ART_DIR = "/tmp/sketchybar-spotify-art"
 
+-- Spotify serves 640x640 covers. SketchyBar's image `scale` is relative to the
+-- source pixels, so a raw cover renders ~544px tall and paints over the rest of
+-- the bar. Downscale on disk to a fixed size instead, then a constant scale
+-- gives a predictable height no matter what the source resolution is.
+-- ART_PX at 2x for retina crispness; displayed height is ART_PX * ART_SCALE.
+local ART_PX = 44
+local ART_SCALE = 0.5
+
 local QUERY = [[osascript -e '
 if application "Spotify" is running then
   tell application "Spotify"
@@ -35,7 +43,7 @@ local media_cover = sbar.add("item", "media.cover", {
   position = "right",
   background = {
     image = {
-      scale = 0.85,
+      scale = ART_SCALE,
       corner_radius = 9,
       border_width = 1,
       border_color = colors.with_alpha(colors.spotify, 0.6),
@@ -123,12 +131,14 @@ local function set_artwork(track_id, url)
   current_art = track_id
 
   -- Cache per track id so sketchybar sees a new path and reloads the image;
-  -- reusing one filename would show a stale cover.
-  local path = ART_DIR .. "/" .. string.gsub(track_id, "[^%w]", "_") .. ".jpg"
+  -- reusing one filename would show a stale cover. The size is part of the
+  -- name so tuning ART_PX invalidates anything cached at the old size.
+  local path = ART_DIR .. "/" .. string.gsub(track_id, "[^%w]", "_") .. "-" .. ART_PX .. ".jpg"
   sbar.exec(
-    "mkdir -p " .. ART_DIR .. " && [ -f " .. path .. " ] || curl -sfL -m 5 -o " .. path .. " '" .. url .. "'",
+    "mkdir -p " .. ART_DIR .. " && { [ -f " .. path .. " ] || { curl -sfL -m 5 -o " .. path .. " '" .. url
+      .. "' && sips -Z " .. ART_PX .. " " .. path .. " >/dev/null 2>&1; }; }",
     function()
-      media_cover:set({ background = { image = { string = path } } })
+      media_cover:set({ background = { image = { string = path, scale = ART_SCALE } } })
     end
   )
 end
