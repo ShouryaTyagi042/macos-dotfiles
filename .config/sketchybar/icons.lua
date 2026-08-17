@@ -39,6 +39,12 @@ local icons = {
       back = "􀊊",
       forward = "􀊌",
       play_pause = "􀊈",
+      play = "􀊃",
+      pause = "􀊅",
+      shuffle = "􀊝",
+      -- `repeat` is a Lua keyword, hence `loop`
+      loop = "􀊞",
+      speaker = "􀊠",
     },
   },
 
@@ -81,6 +87,11 @@ local icons = {
       back = "",
       forward = "",
       play_pause = "",
+      play = "",
+      pause = "",
+      shuffle = "",
+      loop = "",
+      speaker = "",
     },
   },
 }

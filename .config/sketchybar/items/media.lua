@@ -2,42 +2,44 @@ local icons = require("icons")
 local colors = require("colors")
 local settings = require("settings")
 
--- Driven by AppleScript, not the `media_change` event.
+-- Spotify: a compact cover in the bar, expanding to a mini-player popup.
 --
--- `media_change` and nowplaying-cli both read Apple's private MediaRemote
--- framework, which was restricted to first-party apps in macOS 15.4. On 26.x
--- `nowplaying-cli get title artist` returns "null null" even with a track
--- loaded, so the event never fires and the item never draws. Spotify's own
--- AppleScript dictionary still works, so we poll that instead.
+-- State and control both go through helpers/spotify.sh, which drives Spotify's
+-- AppleScript dictionary. The upstream `media_change` event and nowplaying-cli
+-- read Apple's private MediaRemote framework, restricted to first-party apps in
+-- macOS 15.4 — on 26.x it returns null even with a track loaded, so the item
+-- never drew at all.
 --
--- Consequence: this covers Spotify only. The `if application "Spotify" is
--- running` guard matters — a bare `tell application "Spotify"` would launch
--- Spotify every poll.
+-- Layout note: sketchybar popups are a single row *or* a single column
+-- (popup.horizontal is one flag for the whole popup), so this is one wide row
+-- rather than the 2D panel a native widget would use. The three text lines are
+-- stacked by giving their items zero width and offsetting the labels
+-- vertically, then reserving the space with a spacer.
 
-local POLL_SECONDS = 2
+local HELPER = "$CONFIG_DIR/helpers/spotify.sh"
+
+-- Poll slowly for the bar item; the popup needs a finer tick to animate the
+-- scrubber, so the frequency is raised while it is open and dropped on close.
+local POLL_IDLE = 2
+local POLL_OPEN = 1
+
 local ART_DIR = "/tmp/sketchybar-spotify-art"
-
--- Spotify serves 640x640 covers. SketchyBar's image `scale` is relative to the
--- source pixels, so a raw cover renders ~544px tall and paints over the rest of
--- the bar. Downscale on disk to a fixed size instead, then a constant scale
--- gives a predictable height no matter what the source resolution is.
--- ART_PX at 2x for retina crispness; displayed height is ART_PX * ART_SCALE.
-local ART_PX = 44
+-- SketchyBar's image `scale` multiplies the *source* pixels, so the art is
+-- resized on disk to a known size and always rendered at ART_SCALE. Sizes are
+-- 2x the displayed height for retina. Cover art from Spotify is 640x640; left
+-- unscaled it renders ~544px tall and paints over the whole bar.
 local ART_SCALE = 0.5
+local ART_BAR_PX = 44  -- 22pt in the bar
+local ART_POP_PX = 80  -- 40pt in the popup
 
-local QUERY = [[osascript -e '
-if application "Spotify" is running then
-  tell application "Spotify"
-    return (player state as text) & "\n" & name of current track & "\n" & artist of current track & "\n" & id of current track & "\n" & artwork url of current track
-  end tell
-else
-  return "stopped"
-end if' 2>/dev/null]]
-
-local function spotify(command)
-  return "osascript -e 'if application \"Spotify\" is running then tell application \"Spotify\" to "
-    .. command .. "' >/dev/null 2>&1"
+local function fmt_time(seconds)
+  if not seconds or seconds < 0 then seconds = 0 end
+  local mins = math.floor(seconds / 60)
+  local secs = math.floor(seconds % 60)
+  return string.format("%d:%02d", mins, secs)
 end
+
+-- ─── bar item ──────────────────────────────────────────────────────────────
 
 local media_cover = sbar.add("item", "media.cover", {
   position = "right",
@@ -54,7 +56,7 @@ local media_cover = sbar.add("item", "media.cover", {
   label = { drawing = false },
   icon = { drawing = false },
   drawing = false,
-  update_freq = POLL_SECONDS,
+  update_freq = POLL_IDLE,
   updates = true,
   popup = {
     align = "center",
@@ -93,24 +95,159 @@ local media_title = sbar.add("item", "media.title", {
   },
 })
 
-sbar.add("item", "media.back", {
-  position = "popup." .. media_cover.name,
-  icon = { string = icons.media.back, color = colors.white },
+-- ─── popup: cover ──────────────────────────────────────────────────────────
+
+local POPUP = "popup." .. media_cover.name
+
+local pop_art = sbar.add("item", "media.pop.art", {
+  position = POPUP,
+  width = ART_POP_PX * ART_SCALE + 8,
+  background = {
+    image = {
+      scale = ART_SCALE,
+      corner_radius = 6,
+      border_width = 0,
+    },
+    color = colors.transparent,
+    border_width = 0,
+    height = ART_POP_PX * ART_SCALE,
+  },
+  icon = { drawing = false },
   label = { drawing = false },
-  click_script = spotify("previous track"),
 })
-local play_pause = sbar.add("item", "media.play_pause", {
-  position = "popup." .. media_cover.name,
-  icon = { string = icons.media.play_pause, color = colors.spotify },
+
+-- ─── popup: stacked title / album / artist ─────────────────────────────────
+-- Zero-width items draw at the same x and overflow, so the vertical offsets
+-- stack them into three lines. media_title/media_artist above use the same
+-- trick in the bar itself.
+
+local function text_line(name, y_offset, color, style, size)
+  return sbar.add("item", name, {
+    position = POPUP,
+    width = 0,
+    icon = { drawing = false },
+    label = {
+      string = "",
+      width = 0,
+      y_offset = y_offset,
+      color = color,
+      max_chars = 26,
+      align = "left",
+      font = {
+        family = settings.font.text,
+        style = settings.font.style_map[style],
+        size = size,
+      },
+    },
+  })
+end
+
+local pop_title = text_line("media.pop.title", 13, colors.white, "Bold", 13.0)
+local pop_album = text_line("media.pop.album", 0, colors.spotify, "Semibold", 11.0)
+local pop_artist = text_line("media.pop.artist", -13, colors.grey, "Semibold", 11.0)
+
+-- Reserves the horizontal space the three zero-width lines overflow into
+sbar.add("item", "media.pop.textpad", {
+  position = POPUP,
+  width = 210,
+  icon = { drawing = false },
   label = { drawing = false },
-  click_script = spotify("playpause"),
 })
-sbar.add("item", "media.forward", {
-  position = "popup." .. media_cover.name,
-  icon = { string = icons.media.forward, color = colors.white },
+
+-- ─── popup: transport ──────────────────────────────────────────────────────
+
+local function button(name, glyph, action, color)
+  return sbar.add("item", name, {
+    position = POPUP,
+    icon = {
+      string = glyph,
+      color = color or colors.white,
+      font = { family = settings.font.text, size = 14.0 },
+      padding_left = 6,
+      padding_right = 6,
+    },
+    label = { drawing = false },
+    click_script = HELPER .. " " .. action,
+  })
+end
+
+local pop_shuffle = button("media.pop.shuffle", icons.media.shuffle, "shuffle", colors.grey)
+button("media.pop.prev", icons.media.back, "prev")
+local pop_play = button("media.pop.play", icons.media.play_pause, "playpause", colors.spotify)
+button("media.pop.next", icons.media.forward, "next")
+local pop_loop = button("media.pop.loop", icons.media.loop, "loop", colors.grey)
+
+-- ─── popup: scrubber ───────────────────────────────────────────────────────
+
+local pop_elapsed = sbar.add("item", "media.pop.elapsed", {
+  position = POPUP,
+  width = 40,
+  icon = { drawing = false },
+  label = {
+    string = "0:00",
+    color = colors.grey,
+    font = { family = settings.font.numbers, size = 10.0 },
+  },
+})
+
+local pop_progress = sbar.add("slider", "media.pop.progress", 150, {
+  position = POPUP,
+  slider = {
+    highlight_color = colors.spotify,
+    background = {
+      height = 5,
+      corner_radius = 3,
+      color = colors.bg2,
+    },
+    knob = { string = "􀀁", drawing = true },
+  },
+  background = { color = colors.transparent, height = 2, border_width = 0 },
+  -- Duration is appended per-track in render(); seeking needs it to turn the
+  -- click percentage into a position in seconds.
+  click_script = HELPER .. " seek $PERCENTAGE 0",
+})
+
+local pop_remaining = sbar.add("item", "media.pop.remaining", {
+  position = POPUP,
+  width = 44,
+  icon = { drawing = false },
+  label = {
+    string = "-0:00",
+    color = colors.grey,
+    font = { family = settings.font.numbers, size = 10.0 },
+  },
+})
+
+-- ─── popup: volume ─────────────────────────────────────────────────────────
+
+sbar.add("item", "media.pop.volicon", {
+  position = POPUP,
+  icon = {
+    string = icons.media.speaker,
+    color = colors.grey,
+    font = { family = settings.font.text, size = 12.0 },
+    padding_left = 6,
+    padding_right = 2,
+  },
   label = { drawing = false },
-  click_script = spotify("next track"),
 })
+
+local pop_volume = sbar.add("slider", "media.pop.volume", 70, {
+  position = POPUP,
+  slider = {
+    highlight_color = colors.white,
+    background = {
+      height = 5,
+      corner_radius = 3,
+      color = colors.bg2,
+    },
+    knob = { string = "􀀁", drawing = true },
+  },
+  background = { color = colors.transparent, height = 2, border_width = 0 },
+  click_script = HELPER .. " volume $PERCENTAGE",
+})
+
+-- ─── hover behaviour in the bar ────────────────────────────────────────────
 
 local interrupt = 0
 local function animate_detail(detail)
@@ -123,6 +260,8 @@ local function animate_detail(detail)
   end)
 end
 
+-- ─── artwork ───────────────────────────────────────────────────────────────
+
 local current_track = nil
 local current_art = nil
 
@@ -130,67 +269,104 @@ local function set_artwork(track_id, url)
   if not url or url == "" or track_id == current_art then return end
   current_art = track_id
 
-  -- Cache per track id so sketchybar sees a new path and reloads the image;
-  -- reusing one filename would show a stale cover. The size is part of the
-  -- name so tuning ART_PX invalidates anything cached at the old size.
-  local path = ART_DIR .. "/" .. string.gsub(track_id, "[^%w]", "_") .. "-" .. ART_PX .. ".jpg"
-  sbar.exec(
-    "mkdir -p " .. ART_DIR .. " && { [ -f " .. path .. " ] || { curl -sfL -m 5 -o " .. path .. " '" .. url
-      .. "' && sips -Z " .. ART_PX .. " " .. path .. " >/dev/null 2>&1; }; }",
-    function()
-      media_cover:set({ background = { image = { string = path, scale = ART_SCALE } } })
+  -- Cached per track id and per size: sketchybar caches images by path, so a
+  -- fixed filename would keep showing the first cover it ever loaded.
+  local slug = ART_DIR .. "/" .. string.gsub(track_id, "[^%w]", "_")
+  local bar_path = slug .. "-" .. ART_BAR_PX .. ".jpg"
+  local pop_path = slug .. "-" .. ART_POP_PX .. ".jpg"
+
+  local fetch = "mkdir -p " .. ART_DIR .. " && { [ -f " .. pop_path .. " ] || { "
+    .. "curl -sfL -m 5 -o " .. slug .. "-src.jpg '" .. url .. "' && "
+    .. "cp " .. slug .. "-src.jpg " .. bar_path .. " && sips -Z " .. ART_BAR_PX .. " " .. bar_path .. " >/dev/null 2>&1 && "
+    .. "cp " .. slug .. "-src.jpg " .. pop_path .. " && sips -Z " .. ART_POP_PX .. " " .. pop_path .. " >/dev/null 2>&1; "
+    .. "rm -f " .. slug .. "-src.jpg; }; }"
+
+  sbar.exec(fetch, function()
+    media_cover:set({ background = { image = { string = bar_path, scale = ART_SCALE } } })
+    pop_art:set({ background = { image = { string = pop_path, scale = ART_SCALE } } })
+  end)
+end
+
+-- ─── poll ──────────────────────────────────────────────────────────────────
+
+local function hide()
+  if current_track == nil then return end
+  current_track = nil
+  current_art = nil
+  media_cover:set({ drawing = false, popup = { drawing = false } })
+  media_artist:set({ drawing = false })
+  media_title:set({ drawing = false })
+end
+
+local function render(f)
+  local playing = (f.state == "playing")
+  local position = tonumber(f.position) or 0
+  local duration = (tonumber(f.duration) or 0) / 1000  -- Spotify reports ms
+  local percent = duration > 0 and math.floor(position / duration * 100) or 0
+
+  media_cover:set({
+    drawing = true,
+    background = {
+      image = {
+        border_color = playing and colors.with_alpha(colors.spotify, 0.6)
+          or colors.with_alpha(colors.grey, 0.5),
+      },
+    },
+  })
+  media_artist:set({ drawing = true, label = { string = f.artist or "" } })
+  media_title:set({ drawing = true, label = { string = f.title or "" } })
+
+  pop_title:set({ label = { string = f.title or "" } })
+  pop_album:set({ label = { string = f.album or "" } })
+  pop_artist:set({ label = { string = f.artist or "" } })
+
+  pop_play:set({ icon = { string = playing and icons.media.pause or icons.media.play } })
+  pop_shuffle:set({ icon = { color = f.shuffling == "true" and colors.spotify or colors.grey } })
+  pop_loop:set({ icon = { color = f.repeating == "true" and colors.spotify or colors.grey } })
+
+  pop_elapsed:set({ label = { string = fmt_time(position) } })
+  pop_remaining:set({ label = { string = "-" .. fmt_time(duration - position) } })
+  pop_progress:set({
+    slider = { percentage = percent },
+    click_script = HELPER .. " seek $PERCENTAGE " .. string.format("%.3f", duration),
+  })
+  pop_volume:set({ slider = { percentage = tonumber(f.volume) or 0 } })
+
+  if f.track_id then set_artwork(f.track_id, f.art_url) end
+
+  -- Only slide the bar detail out on an actual track change; otherwise every
+  -- poll would retrigger the animation.
+  if f.track_id ~= current_track then
+    current_track = f.track_id
+    if playing then
+      animate_detail(true)
+      interrupt = interrupt + 1
+      sbar.delay(5, animate_detail)
     end
-  )
+  end
 end
 
 local function poll()
-  sbar.exec(QUERY, function(result)
+  sbar.exec(HELPER .. " get", function(result)
     local lines = {}
     for line in string.gmatch(result or "", "[^\r\n]+") do
       lines[#lines + 1] = line
     end
 
-    local state = lines[1]
-    if state ~= "playing" and state ~= "paused" then
-      if current_track ~= nil then
-        current_track = nil
-        current_art = nil
-        media_cover:set({ drawing = false, popup = { drawing = false } })
-        media_artist:set({ drawing = false })
-        media_title:set({ drawing = false })
-      end
+    -- Field order is fixed by helpers/spotify.sh
+    local f = {
+      state = lines[1], title = lines[2], album = lines[3], artist = lines[4],
+      track_id = lines[5], art_url = lines[6], position = lines[7],
+      duration = lines[8], shuffling = lines[9], repeating = lines[10],
+      volume = lines[11],
+    }
+
+    if f.state ~= "playing" and f.state ~= "paused" then
+      hide()
       return
     end
 
-    local title, artist, track_id, art_url = lines[2], lines[3], lines[4], lines[5]
-    local playing = (state == "playing")
-
-    -- Dim the cover while paused so the bar reads at a glance
-    media_cover:set({
-      drawing = true,
-      background = {
-        image = {
-          border_color = playing and colors.with_alpha(colors.spotify, 0.6)
-            or colors.with_alpha(colors.grey, 0.5),
-        },
-      },
-    })
-    media_artist:set({ drawing = true, label = { string = artist or "" } })
-    media_title:set({ drawing = true, label = { string = title or "" } })
-    play_pause:set({ icon = { color = playing and colors.spotify or colors.grey } })
-
-    if track_id then set_artwork(track_id, art_url) end
-
-    -- Only slide the details out when the track actually changes, otherwise
-    -- every 2s poll would re-trigger the animation.
-    if track_id ~= current_track then
-      current_track = track_id
-      if playing then
-        animate_detail(true)
-        interrupt = interrupt + 1
-        sbar.delay(5, animate_detail)
-      end
-    end
+    render(f)
   end)
 end
 
@@ -205,10 +381,18 @@ media_cover:subscribe("mouse.exited", function(env)
   animate_detail(false)
 end)
 
+local function set_popup(open)
+  media_cover:set({
+    popup = { drawing = open },
+    update_freq = open and POLL_OPEN or POLL_IDLE,
+  })
+  if open then poll() end
+end
+
 media_cover:subscribe("mouse.clicked", function(env)
-  media_cover:set({ popup = { drawing = "toggle" } })
+  set_popup(media_cover:query().popup.drawing == "off")
 end)
 
 media_title:subscribe("mouse.exited.global", function(env)
-  media_cover:set({ popup = { drawing = false } })
+  set_popup(false)
 end)

@@ -83,14 +83,28 @@ Two items are deliberately not built the way upstream builds them:
   workspaces per update. All ten stay visible so the row never shifts; empty ones
   are dimmed rather than hidden.
   Items keep the `space.N` name because `menus.lua` toggles the `/space\..*/` group.
-- **`items/media.lua` polls Spotify over AppleScript.** The upstream `media_change`
-  event and `nowplaying-cli` both read Apple's private MediaRemote framework, which was
-  restricted to first-party apps in macOS 15.4 — on 26.x it returns null for everything,
-  so the item never drew. AppleScript still works, at the cost of being Spotify-only.
-  The `if application "Spotify" is running` guard is load-bearing: a bare `tell
-  application "Spotify"` would launch Spotify on every poll. Album art is cached per
-  track id under `/tmp/sketchybar-spotify-art/` — a fixed filename would show stale
-  covers, since SketchyBar caches images by path.
+- **`items/media.lua` drives Spotify over AppleScript**, through `helpers/spotify.sh`.
+  The upstream `media_change` event and `nowplaying-cli` both read Apple's private
+  MediaRemote framework, which was restricted to first-party apps in macOS 15.4 — on
+  26.x it returns null for everything, so the item never drew. AppleScript still works,
+  at the cost of being Spotify-only. The `if application "Spotify" is running` guard is
+  load-bearing: a bare `tell application "Spotify"` would launch Spotify on every poll.
+
+  The cover sits in the bar; clicking it opens a mini-player with album art, title,
+  album, artist, shuffle / prev / play-pause / next / repeat, a seekable scrubber with
+  elapsed and remaining times, and a volume slider. Polling drops from 2s to 1s while
+  the popup is open so the scrubber tracks smoothly.
+
+  Two shape constraints worth knowing before editing it:
+  - **A popup is one row or one column**, never a grid — `popup.horizontal` is a single
+    flag for the whole popup. Hence the wide single row. The three text lines are
+    stacked by giving those items zero width and offsetting their labels vertically,
+    with a spacer item reserving the space they overflow into.
+  - **Image `scale` multiplies source pixels, not a target size.** Spotify serves
+    640x640, so art is resized on disk with `sips` to a known size and always rendered
+    at a fixed scale. Files are cached per track id *and* size under
+    `/tmp/sketchybar-spotify-art/`; SketchyBar caches images by path, so a fixed
+    filename would keep showing the first cover it ever loaded.
 
 ## Conventions
 
