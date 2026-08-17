@@ -79,22 +79,38 @@ local function update_spaces(focused)
       local key = tostring(i)
       local selected = (key == focused)
       local occupied = icon_lines[key] ~= nil
-      local visible = selected or occupied
+
+      -- All ten stay visible so the row never shifts position. Empty ones are
+      -- dimmed rather than hidden, so the occupied ones read at a glance.
+      -- `highlight` overrides these colours with the *_highlight values when
+      -- the workspace is focused.
+      local icon_color = occupied and colors.white or colors.with_alpha(colors.grey, 0.5)
+      local label_color = occupied and colors.grey or colors.with_alpha(colors.grey, 0.4)
+      local border = colors.bg2
+      if selected then
+        border = colors.blue
+      elseif not occupied then
+        border = colors.with_alpha(colors.bg2, 0.4)
+      end
 
       spaces[i]:set({
-        drawing = visible,
-        icon = { highlight = selected },
+        drawing = true,
+        icon = { highlight = selected, color = icon_color },
         label = {
           highlight = selected,
+          color = label_color,
           string = icon_lines[key] or " —",
         },
-        background = { border_color = selected and colors.blue or colors.bg2 },
+        background = {
+          color = occupied and colors.bg1 or colors.with_alpha(colors.bg1, 0.4),
+          border_color = border,
+        },
       })
       brackets[i]:set({
-        drawing = visible,
-        background = { border_color = selected and colors.blue or colors.bg2 },
+        drawing = true,
+        background = { border_color = border },
       })
-      sbar.set("space.padding." .. i, { drawing = visible })
+      sbar.set("space.padding." .. i, { drawing = true })
     end
   end)
 end

@@ -80,7 +80,8 @@ Two items are deliberately not built the way upstream builds them:
 - **`items/spaces.lua` is driven by AeroSpace, not yabai.** It registers the custom
   `aerospace_workspace_change` event that `.aerospace.toml` fires, and clicks run
   `aerospace workspace N`. A single `aerospace list-windows --all` call feeds all ten
-  workspaces per update. Workspaces with no windows stay hidden unless focused.
+  workspaces per update. All ten stay visible so the row never shifts; empty ones
+  are dimmed rather than hidden.
   Items keep the `space.N` name because `menus.lua` toggles the `/space\..*/` group.
 - **`items/media.lua` polls Spotify over AppleScript.** The upstream `media_change`
   event and `nowplaying-cli` both read Apple's private MediaRemote framework, which was
