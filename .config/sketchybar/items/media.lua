@@ -128,7 +128,9 @@ local function text_line(name, y_offset, color, style, size)
     icon = { drawing = false },
     label = {
       string = "",
-      width = 0,
+      -- Deliberately no `width = 0` here. The *item* is zero-width so the three
+      -- lines overlay at the same x; the label must stay dynamic or it renders
+      -- at zero width and never appears.
       y_offset = y_offset,
       color = color,
       max_chars = 26,
