@@ -1,0 +1,13 @@
+
+# border width
+width=5.0
+
+# active border color
+active_color=0xff7aa2f7   # TokyoNight blue (change if needed)
+
+# inactive border color
+inactive_color=0xff3b4261 # TokyoNight border grey
+
+# disable borders for specific apps
+blacklist="Loom, CleanShot X"
+

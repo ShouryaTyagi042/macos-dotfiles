@@ -1,0 +1,5 @@
+.DS_Store
+
+# Compiled sketchybar helper binaries — rebuild with `make` (see README)
+bin/
+*.o
