@@ -18,7 +18,7 @@ startup via `helpers/init.lua`, which shells out to `make`.
 ## Install
 
 ```bash
-git clone https://github.com/ShouryaTyagi042/dotfiles.git ~/dotfiles
+git clone https://github.com/ShouryaTyagi042/macos-dotfiles.git ~/dotfiles
 cd ~/dotfiles && ./install.sh
 ```
 
@@ -54,8 +54,8 @@ with both normalizations on — the tree stays shallow and auto-alternates H/V.
 | `alt-slash` / `alt-comma` | Cycle tiles / accordion layout (each press flips orientation) |
 | `alt-f` | Fullscreen |
 | `alt-1`…`alt-0` | Switch workspace · add `shift` to move the window there |
-| `alt-tab` | Toggle between current and previous workspace |
-| `alt-backtick` | Focus right, wrapping around the workspace |
+| `alt-tab` | Cycle focus through windows in the current workspace |
+| `alt-backtick` | Toggle between current and previous workspace |
 | `alt-shift-tab` | Move workspace to next monitor |
 | `alt-shift-c` | Reload config |
 | `alt-shift-;` | Enter service mode |

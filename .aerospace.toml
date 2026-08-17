@@ -177,11 +177,13 @@ alt-shift-8 = 'move-node-to-workspace 8'
 alt-shift-9 = 'move-node-to-workspace 9'
 alt-shift-0 = 'move-node-to-workspace 10'
 
-# See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
-alt-tab = 'workspace-back-and-forth'
-
 # Cycle focus through the windows of the current workspace
-alt-backtick = 'focus right --boundaries-action wrap-around-the-workspace'
+# See: https://nikitabobko.github.io/AeroSpace/commands#focus
+alt-tab = 'focus right --boundaries-action wrap-around-the-workspace'
+
+# Toggle between the current and previous workspace
+# See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
+alt-backtick = 'workspace-back-and-forth'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
 alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
