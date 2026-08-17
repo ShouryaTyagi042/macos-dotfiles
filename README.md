@@ -69,6 +69,28 @@ App launchers: `alt-enter` Warp · `alt-a` Arc · `alt-c` Cursor · `alt-s` Slac
 Auto-placement: wezterm + Warp → 1, Arc → 2, Cursor → 3, Telegram + WhatsApp → 9,
 Loom → floating.
 
+## SketchyBar
+
+Tokyo Night palette, defined once in `colors.lua`. Left side: Apple menu, workspace
+indicator (click the toggle to swap between workspaces and the focused app's menu bar).
+Right side: Spotify, CPU graph, wifi, volume, battery, clock.
+
+Two items are deliberately not built the way upstream builds them:
+
+- **`items/spaces.lua` is driven by AeroSpace, not yabai.** It registers the custom
+  `aerospace_workspace_change` event that `.aerospace.toml` fires, and clicks run
+  `aerospace workspace N`. A single `aerospace list-windows --all` call feeds all ten
+  workspaces per update. Workspaces with no windows stay hidden unless focused.
+  Items keep the `space.N` name because `menus.lua` toggles the `/space\..*/` group.
+- **`items/media.lua` polls Spotify over AppleScript.** The upstream `media_change`
+  event and `nowplaying-cli` both read Apple's private MediaRemote framework, which was
+  restricted to first-party apps in macOS 15.4 — on 26.x it returns null for everything,
+  so the item never drew. AppleScript still works, at the cost of being Spotify-only.
+  The `if application "Spotify" is running` guard is load-bearing: a bare `tell
+  application "Spotify"` would launch Spotify on every poll. Album art is cached per
+  track id under `/tmp/sketchybar-spotify-art/` — a fixed filename would show stale
+  covers, since SketchyBar caches images by path.
+
 ## Conventions
 
 - **Border styling lives only in `bordersrc`.** AeroSpace starts `borders` with no arguments,

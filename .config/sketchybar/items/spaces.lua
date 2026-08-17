@@ -3,21 +3,29 @@ local icons = require("icons")
 local settings = require("settings")
 local app_icons = require("helpers.app_icons")
 
-local spaces = {}
+-- AeroSpace, not yabai. ~/.aerospace.toml fires this on every workspace switch
+-- via exec-on-workspace-change; without registering it here nothing arrives.
+sbar.add("event", "aerospace_workspace_change")
 
-for i = 1, 10, 1 do
-  local space = sbar.add("space", "space." .. i, {
-    space = i,
+local WORKSPACE_COUNT = 10
+
+local spaces = {}
+local brackets = {}
+
+for i = 1, WORKSPACE_COUNT, 1 do
+  -- Named "space.N" because menus.lua toggles the whole /space\..*/ group
+  local space = sbar.add("item", "space." .. i, {
+    drawing = false,
     icon = {
       font = { family = settings.font.numbers },
       string = i,
-      padding_left = 15,
+      padding_left = 12,
       padding_right = 8,
-      color = colors.white,
-      highlight_color = colors.red,
+      color = colors.grey,
+      highlight_color = colors.blue,
     },
     label = {
-      padding_right = 20,
+      padding_right = 16,
       color = colors.grey,
       highlight_color = colors.white,
       font = "sketchybar-app-font:Regular:16.0",
@@ -31,73 +39,86 @@ for i = 1, 10, 1 do
       height = 26,
       border_color = colors.black,
     },
-    popup = { background = { border_width = 5, border_color = colors.black } }
+    click_script = "aerospace workspace " .. i,
   })
 
   spaces[i] = space
 
-  -- Single item bracket for space items to achieve double border on highlight
-  local space_bracket = sbar.add("bracket", { space.name }, {
+  -- Single-item bracket, so a focused workspace gets a double border
+  brackets[i] = sbar.add("bracket", { space.name }, {
+    drawing = false,
     background = {
       color = colors.transparent,
       border_color = colors.bg2,
       height = 28,
-      border_width = 2
-    }
+      border_width = 2,
+    },
   })
 
-  -- Padding space
-  sbar.add("space", "space.padding." .. i, {
-    space = i,
-    script = "",
+  sbar.add("item", "space.padding." .. i, {
+    drawing = false,
     width = settings.group_paddings,
   })
+end
 
-  local space_popup = sbar.add("item", {
-    position = "popup." .. space.name,
-    padding_left= 5,
-    padding_right= 0,
-    background = {
-      drawing = true,
-      image = {
-        corner_radius = 9,
-        scale = 0.2
-      }
-    }
-  })
+-- One `aerospace list-windows` call feeds every workspace, rather than ten.
+-- Empty, unfocused workspaces stay hidden, so the bar only shows what exists.
+local function update_spaces(focused)
+  sbar.exec("aerospace list-windows --all --format '%{workspace}|%{app-name}'", function(windows)
+    local icon_lines = {}
 
-  space:subscribe("space_change", function(env)
-    local selected = env.SELECTED == "true"
-    local color = selected and colors.grey or colors.bg2
-    space:set({
-      icon = { highlight = selected, },
-      label = { highlight = selected },
-      background = { border_color = selected and colors.black or colors.bg2 }
-    })
-    space_bracket:set({
-      background = { border_color = selected and colors.grey or colors.bg2 }
-    })
-  end)
-
-  space:subscribe("mouse.clicked", function(env)
-    if env.BUTTON == "other" then
-      space_popup:set({ background = { image = "space." .. env.SID } })
-      space:set({ popup = { drawing = "toggle" } })
-    else
-      local op = (env.BUTTON == "right") and "--destroy" or "--focus"
-      sbar.exec("yabai -m space " .. op .. " " .. env.SID)
+    for line in string.gmatch(windows or "", "[^\r\n]+") do
+      local workspace, app = string.match(line, "^%s*(%S+)%s*|%s*(.-)%s*$")
+      if workspace and app then
+        local icon = app_icons[app] or app_icons["Default"]
+        icon_lines[workspace] = (icon_lines[workspace] or "") .. icon
+      end
     end
-  end)
 
-  space:subscribe("mouse.exited", function(_)
-    space:set({ popup = { drawing = false } })
+    for i = 1, WORKSPACE_COUNT, 1 do
+      local key = tostring(i)
+      local selected = (key == focused)
+      local occupied = icon_lines[key] ~= nil
+      local visible = selected or occupied
+
+      spaces[i]:set({
+        drawing = visible,
+        icon = { highlight = selected },
+        label = {
+          highlight = selected,
+          string = icon_lines[key] or " —",
+        },
+        background = { border_color = selected and colors.blue or colors.bg2 },
+      })
+      brackets[i]:set({
+        drawing = visible,
+        background = { border_color = selected and colors.blue or colors.bg2 },
+      })
+      sbar.set("space.padding." .. i, { drawing = visible })
+    end
   end)
 end
 
-local space_window_observer = sbar.add("item", {
-  drawing = false,
-  updates = true,
-})
+local function refresh()
+  sbar.exec("aerospace list-workspaces --focused", function(focused)
+    update_spaces((focused or ""):gsub("%s+", ""))
+  end)
+end
+
+local space_observer = sbar.add("item", { drawing = false, updates = true })
+
+space_observer:subscribe("aerospace_workspace_change", function(env)
+  update_spaces(env.FOCUSED_WORKSPACE)
+end)
+
+-- Windows open, close and move between workspaces without the focused
+-- workspace changing, so the icon rows need refreshing on app switches too.
+space_observer:subscribe("front_app_switched", refresh)
+space_observer:subscribe("system_woke", refresh)
+
+-- menus.lua reveals the whole /space\..*/ group on swap-back, which would also
+-- reveal the empty workspaces. Re-apply visibility afterwards.
+space_observer:subscribe("swap_menus_and_spaces", refresh)
 
 local spaces_indicator = sbar.add("item", {
   padding_left = -3,
@@ -120,24 +141,6 @@ local spaces_indicator = sbar.add("item", {
     border_color = colors.with_alpha(colors.bg1, 0.0),
   }
 })
-
-space_window_observer:subscribe("space_windows_change", function(env)
-  local icon_line = ""
-  local no_app = true
-  for app, count in pairs(env.INFO.apps) do
-    no_app = false
-    local lookup = app_icons[app]
-    local icon = ((lookup == nil) and app_icons["Default"] or lookup)
-    icon_line = icon_line .. icon
-  end
-
-  if (no_app) then
-    icon_line = " —"
-  end
-  sbar.animate("tanh", 10, function()
-    spaces[env.INFO.space]:set({ label = icon_line })
-  end)
-end)
 
 spaces_indicator:subscribe("swap_menus_and_spaces", function(env)
   local currently_on = spaces_indicator:query().icon.value == icons.switch.on
@@ -175,3 +178,6 @@ end)
 spaces_indicator:subscribe("mouse.clicked", function(env)
   sbar.trigger("swap_menus_and_spaces")
 end)
+
+-- Paint the initial state; no event fires until the first workspace switch.
+refresh()

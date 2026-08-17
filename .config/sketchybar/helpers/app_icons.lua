@@ -64,6 +64,8 @@ return {
 	["DaVinci Resolve"] = ":davinciresolve:",
 	["Deezer"] = ":deezer:",
 	["Default"] = ":default:",
+	-- sketchybar-app-font ships no pgAdmin glyph; DataGrip is the closest DB one
+	["pgAdmin 4"] = ":datagrip:",
 	["CleanMyMac X"] = ":desktop:",
 	["DEVONthink 3"] = ":devonthink3:",
 	["DingTalk"] = ":dingtalk:",
