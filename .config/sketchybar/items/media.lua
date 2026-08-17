@@ -64,16 +64,10 @@ local media_cover = sbar.add("item", "media.cover", {
   }
 })
 
--- Title sits on the upper line, artist below it — the same order the popup uses.
--- media_title is the only one of the pair with a real width, so it reserves the
--- box and media_artist (pinned to zero width) overlays it. Both labels keep the
--- default centre alignment: the items are zero-width, so a left anchor pins the
--- text inside a zero box and clips it to one glyph -- only centring overflows
--- both ways. Both cap at the same max_chars so neither line overhangs.
 local media_artist = sbar.add("item", "media.artist", {
   position = "right",
   drawing = false,
-  padding_left = 2,
+  padding_left = 3,
   padding_right = 0,
   width = 0,
   icon = { drawing = false },
@@ -81,15 +75,15 @@ local media_artist = sbar.add("item", "media.artist", {
     width = 0,
     font = { size = 9 },
     color = colors.with_alpha(colors.white, 0.6),
-    max_chars = 16,
-    y_offset = -6,
+    max_chars = 18,
+    y_offset = 6,
   },
 })
 
 local media_title = sbar.add("item", "media.title", {
   position = "right",
   drawing = false,
-  padding_left = 2,
+  padding_left = 3,
   padding_right = 0,
   icon = { drawing = false },
   label = {
@@ -97,23 +91,8 @@ local media_title = sbar.add("item", "media.title", {
     color = colors.white,
     width = 0,
     max_chars = 16,
-    y_offset = 6,
+    y_offset = -5,
   },
-})
-
--- Groups the cover and the two text lines into one pill, the way the cpu /
--- volume / wifi widgets are bracketed. Its drawing is toggled alongside the
--- items in hide()/render(), otherwise an empty pill lingers when Spotify quits.
-local media_bracket = sbar.add("bracket", "media.bracket", {
-  media_title.name, media_artist.name, media_cover.name
-}, {
-  background = { color = colors.bg1 },
-  drawing = false,
-})
-
-sbar.add("item", "media.padding", {
-  position = "right",
-  width = settings.group_paddings,
 })
 
 -- ─── popup: cover ──────────────────────────────────────────────────────────
@@ -319,7 +298,6 @@ local function hide()
   media_cover:set({ drawing = false, popup = { drawing = false } })
   media_artist:set({ drawing = false })
   media_title:set({ drawing = false })
-  media_bracket:set({ drawing = false })
 end
 
 local function render(f)
@@ -339,7 +317,6 @@ local function render(f)
   })
   media_artist:set({ drawing = true, label = { string = f.artist or "" } })
   media_title:set({ drawing = true, label = { string = f.title or "" } })
-  media_bracket:set({ drawing = true })
 
   pop_title:set({ label = { string = f.title or "" } })
   pop_album:set({ label = { string = f.album or "" } })
