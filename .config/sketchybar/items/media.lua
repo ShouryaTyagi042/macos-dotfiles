@@ -18,8 +18,9 @@ local settings = require("settings")
 
 local HELPER = "$CONFIG_DIR/helpers/spotify.sh"
 
--- Poll slowly for the bar item; the popup needs a finer tick to animate the
--- scrubber, so the frequency is raised while it is open and dropped on close.
+-- Poll slowly for the bar item; the frequency is raised while the popup is open
+-- so the play/pause and shuffle/repeat glyphs keep up with changes made from
+-- Spotify itself, and dropped again on close.
 local POLL_IDLE = 2
 local POLL_OPEN = 1
 
@@ -31,13 +32,6 @@ local ART_DIR = "/tmp/sketchybar-spotify-art"
 local ART_SCALE = 0.5
 local ART_BAR_PX = 44  -- 22pt in the bar
 local ART_POP_PX = 80  -- 40pt in the popup
-
-local function fmt_time(seconds)
-  if not seconds or seconds < 0 then seconds = 0 end
-  local mins = math.floor(seconds / 60)
-  local secs = math.floor(seconds % 60)
-  return string.format("%d:%02d", mins, secs)
-end
 
 -- ─── bar item ──────────────────────────────────────────────────────────────
 
@@ -61,6 +55,15 @@ local media_cover = sbar.add("item", "media.cover", {
   popup = {
     align = "center",
     horizontal = true,
+    -- Card, not a strip: a rounder corner than the 9 the other popups use.
+    -- The height is left alone -- sketchybar derives it from the tallest item
+    -- (the 40pt cover art), and an explicit popup.background.height is ignored.
+    background = {
+      corner_radius = 14,
+      border_width = 2,
+      border_color = colors.popup.border,
+      color = colors.popup.bg,
+    },
   }
 })
 
@@ -133,7 +136,7 @@ local function text_line(name, y_offset, color, style, size)
       -- at zero width and never appears.
       y_offset = y_offset,
       color = color,
-      max_chars = 26,
+      max_chars = 20,
       align = "left",
       font = {
         family = settings.font.text,
@@ -148,10 +151,12 @@ local pop_title = text_line("media.pop.title", 13, colors.white, "Bold", 13.0)
 local pop_album = text_line("media.pop.album", 0, colors.spotify, "Semibold", 11.0)
 local pop_artist = text_line("media.pop.artist", -13, colors.grey, "Semibold", 11.0)
 
--- Reserves the horizontal space the three zero-width lines overflow into
+-- Reserves the horizontal space the three zero-width lines overflow into.
+-- Sized to the 20-char cap above: any wider and the card carries dead space
+-- between the text and the transport buttons.
 sbar.add("item", "media.pop.textpad", {
   position = POPUP,
-  width = 210,
+  width = 160,
   icon = { drawing = false },
   label = { drawing = false },
 })
@@ -179,75 +184,11 @@ local pop_play = button("media.pop.play", icons.media.play_pause, "playpause", c
 button("media.pop.next", icons.media.forward, "next")
 local pop_loop = button("media.pop.loop", icons.media.loop, "loop", colors.grey)
 
--- ─── popup: scrubber ───────────────────────────────────────────────────────
-
-local pop_elapsed = sbar.add("item", "media.pop.elapsed", {
-  position = POPUP,
-  width = 40,
-  icon = { drawing = false },
-  label = {
-    string = "0:00",
-    color = colors.grey,
-    font = { family = settings.font.numbers, size = 10.0 },
-  },
-})
-
-local pop_progress = sbar.add("slider", "media.pop.progress", 150, {
-  position = POPUP,
-  slider = {
-    highlight_color = colors.spotify,
-    background = {
-      height = 5,
-      corner_radius = 3,
-      color = colors.bg2,
-    },
-    knob = { string = "􀀁", drawing = true },
-  },
-  background = { color = colors.transparent, height = 2, border_width = 0 },
-  -- Duration is appended per-track in render(); seeking needs it to turn the
-  -- click percentage into a position in seconds.
-  click_script = HELPER .. " seek $PERCENTAGE 0",
-})
-
-local pop_remaining = sbar.add("item", "media.pop.remaining", {
-  position = POPUP,
-  width = 44,
-  icon = { drawing = false },
-  label = {
-    string = "-0:00",
-    color = colors.grey,
-    font = { family = settings.font.numbers, size = 10.0 },
-  },
-})
-
--- ─── popup: volume ─────────────────────────────────────────────────────────
-
-sbar.add("item", "media.pop.volicon", {
-  position = POPUP,
-  icon = {
-    string = icons.media.speaker,
-    color = colors.grey,
-    font = { family = settings.font.text, size = 12.0 },
-    padding_left = 6,
-    padding_right = 2,
-  },
-  label = { drawing = false },
-})
-
-local pop_volume = sbar.add("slider", "media.pop.volume", 70, {
-  position = POPUP,
-  slider = {
-    highlight_color = colors.white,
-    background = {
-      height = 5,
-      corner_radius = 3,
-      color = colors.bg2,
-    },
-    knob = { string = "􀀁", drawing = true },
-  },
-  background = { color = colors.transparent, height = 2, border_width = 0 },
-  click_script = HELPER .. " volume $PERCENTAGE",
-})
+-- The scrubber (elapsed / seek slider / remaining) and the volume slider used
+-- to sit here. They are the only reason the popup needed the finer POLL_OPEN
+-- tick, and they stretched it into a full-width strip; the card keeps just the
+-- five transport controls. helpers/spotify.sh still implements `seek` and
+-- `volume`, so re-adding them is a matter of restoring the items.
 
 -- ─── hover behaviour in the bar ────────────────────────────────────────────
 
@@ -302,9 +243,6 @@ end
 
 local function render(f)
   local playing = (f.state == "playing")
-  local position = tonumber(f.position) or 0
-  local duration = (tonumber(f.duration) or 0) / 1000  -- Spotify reports ms
-  local percent = duration > 0 and math.floor(position / duration * 100) or 0
 
   media_cover:set({
     drawing = true,
@@ -325,14 +263,6 @@ local function render(f)
   pop_play:set({ icon = { string = playing and icons.media.pause or icons.media.play } })
   pop_shuffle:set({ icon = { color = f.shuffling == "true" and colors.spotify or colors.grey } })
   pop_loop:set({ icon = { color = f.repeating == "true" and colors.spotify or colors.grey } })
-
-  pop_elapsed:set({ label = { string = fmt_time(position) } })
-  pop_remaining:set({ label = { string = "-" .. fmt_time(duration - position) } })
-  pop_progress:set({
-    slider = { percentage = percent },
-    click_script = HELPER .. " seek $PERCENTAGE " .. string.format("%.3f", duration),
-  })
-  pop_volume:set({ slider = { percentage = tonumber(f.volume) or 0 } })
 
   if f.track_id then set_artwork(f.track_id, f.art_url) end
 
