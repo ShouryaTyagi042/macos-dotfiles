@@ -15,8 +15,11 @@ after-login-command = []
 after-startup-command = [
   'exec-and-forget sketchybar >> $HOME/.sketchybar/service.log 2>&1',
   # JankyBorders has a built-in detection of already running process,
-  # so it won't be run twice on AeroSpace restart
-  'exec-and-forget borders active_color=0xffe1e3e4 inactive_color=0xff494d64 width=5.0 blacklist="Loom"',
+  # so it won't be run twice on AeroSpace restart.
+  # Launched with no arguments on purpose: inline flags override ~/.config/borders/bordersrc
+  # entirely, so passing them here would make the winning config depend on which process
+  # started first. All border styling lives in bordersrc.
+  'exec-and-forget borders',
   'exec-and-forget sketchybar --reload'
 ]
 
@@ -77,7 +80,7 @@ outer.left = 3
 outer.bottom = 3
 outer.right = 3
 outer.top = [
-  { monitor."MSI MP275Q" = 40 },
+  { monitor."MSI MD272QXP" = 40 },
   { monitor."Apple TV 4k" = 40 },
   45,
 ]
@@ -142,7 +145,7 @@ alt-l = 'focus right'
 # See: https://nikitabobko.github.io/AeroSpace/commands#move
 alt-shift-h = 'move left'
 alt-shift-j = 'move down'
-alt-shift-k = 'move up' 
+alt-shift-k = 'move up'
 alt-shift-l = 'move right'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#resize
@@ -175,7 +178,10 @@ alt-shift-9 = 'move-node-to-workspace 9'
 alt-shift-0 = 'move-node-to-workspace 10'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#workspace-back-and-forth
-alt-tab = 'focus right --boundaries-action wrap-around-the-workspace'
+alt-tab = 'workspace-back-and-forth'
+
+# Cycle focus through the windows of the current workspace
+alt-backtick = 'focus right --boundaries-action wrap-around-the-workspace'
 
 # See: https://nikitabobko.github.io/AeroSpace/commands#move-workspace-to-monitor
 alt-shift-tab = 'move-workspace-to-monitor --wrap-around next'
@@ -230,6 +236,11 @@ alt-shift-right = [
 
 [[on-window-detected]]
 if.app-name-regex-substring = '^wezterm-gui$'
+run = 'move-node-to-workspace 1'
+
+# Warp is what alt-enter actually launches
+[[on-window-detected]]
+if.app-id = 'dev.warp.Warp-Stable'
 run = 'move-node-to-workspace 1'
 
 [[on-window-detected]]

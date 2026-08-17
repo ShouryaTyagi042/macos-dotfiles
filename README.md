@@ -54,7 +54,8 @@ with both normalizations on — the tree stays shallow and auto-alternates H/V.
 | `alt-slash` / `alt-comma` | Cycle tiles / accordion layout (each press flips orientation) |
 | `alt-f` | Fullscreen |
 | `alt-1`…`alt-0` | Switch workspace · add `shift` to move the window there |
-| `alt-tab` | Focus right, wrapping around the workspace |
+| `alt-tab` | Toggle between current and previous workspace |
+| `alt-backtick` | Focus right, wrapping around the workspace |
 | `alt-shift-tab` | Move workspace to next monitor |
 | `alt-shift-c` | Reload config |
 | `alt-shift-;` | Enter service mode |
@@ -65,16 +66,14 @@ Service mode (`esc` to leave): `r` reset layout · `f` toggle floating/tiling ·
 App launchers: `alt-enter` Warp · `alt-a` Arc · `alt-c` Cursor · `alt-s` Slack ·
 `alt-n` Notion · `alt-p` Postman · `alt-m` Spotify · `alt-d` pgAdmin 4.
 
-Auto-placement: wezterm → 1, Arc → 2, Cursor → 3, Telegram + WhatsApp → 9, Loom → floating.
+Auto-placement: wezterm + Warp → 1, Arc → 2, Cursor → 3, Telegram + WhatsApp → 9,
+Loom → floating.
 
-## Known quirks
+## Conventions
 
-- **`bordersrc` is not actually read.** AeroSpace's `after-startup-command` launches `borders`
-  with inline flags (`active_color=0xffe1e3e4 inactive_color=0xff494d64 width=5.0
-  blacklist="Loom"`), which take precedence over the config file. The TokyoNight colours in
-  `bordersrc` are therefore dead unless you drop those flags from `.aerospace.toml`.
-- **`gaps.outer.top` matches no monitor.** The per-monitor list targets `MSI MP275Q` and
-  `Apple TV 4k`; the actual display is `MSI MD272QXP`, so the `45` fallback always wins.
-- **`alt-enter` opens Warp, but the workspace-1 rule matches `wezterm-gui`** — the terminal
-  never gets auto-assigned.
-- **`alt-tab` is `focus right`,** not `workspace-back-and-forth`, despite the comment above it.
+- **Border styling lives only in `bordersrc`.** AeroSpace starts `borders` with no arguments,
+  because inline flags override the config file wholesale — passing both makes the winning
+  config depend on which process happened to start first. Change colours in one place.
+- **Per-monitor gap rules key off the exact `aerospace list-monitors` name.** A pattern that
+  matches nothing fails silently and falls through to the list's trailing default, so verify
+  the name after swapping displays.
