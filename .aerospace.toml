@@ -115,6 +115,7 @@ alt-c = 'exec-and-forget open -a cursor'
 alt-n = 'exec-and-forget open -a notion'
 alt-p = 'exec-and-forget open -a postman'
 alt-d = 'exec-and-forget open -a "pgadmin 4"'
+alt-o = 'exec-and-forget open -a "mongodb compass"'
 
 
 # See: https://nikitabobko.github.io/AeroSpace/goodness#open-a-new-window-with-applescript

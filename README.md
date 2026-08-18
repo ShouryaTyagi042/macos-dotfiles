@@ -64,7 +64,8 @@ Service mode (`esc` to leave): `r` reset layout · `f` toggle floating/tiling ·
 `backspace` close all but current · `alt-shift-<arrow>` join with neighbour.
 
 App launchers: `alt-enter` Warp · `alt-a` Arc · `alt-c` Cursor · `alt-s` Slack ·
-`alt-n` Notion · `alt-p` Postman · `alt-m` Spotify · `alt-d` pgAdmin 4.
+`alt-n` Notion · `alt-p` Postman · `alt-m` Spotify · `alt-d` pgAdmin 4 ·
+`alt-o` MongoDB Compass.
 
 Auto-placement: wezterm + Warp → 1, Arc → 2, Cursor → 3, Telegram + WhatsApp → 9,
 Loom → floating.
