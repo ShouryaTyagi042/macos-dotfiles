@@ -7,18 +7,22 @@ local app_icons = require("helpers.app_icons")
 -- via exec-on-workspace-change; without registering it here nothing arrives.
 sbar.add("event", "aerospace_workspace_change")
 
-local WORKSPACE_COUNT = 10
+-- Every workspace, numbered and repo letters alike (see
+-- ~/.config/aerospace/repos.conf for what the letters route to). None are
+-- pinned -- a workspace's icon only appears while it holds a window or is
+-- the focused one, so the bar reflects what's actually open.
+local WORKSPACES = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "O", "C", "Z" }
 
 local spaces = {}
 local brackets = {}
 
-for i = 1, WORKSPACE_COUNT, 1 do
+for i, key in ipairs(WORKSPACES) do
   -- Named "space.N" because menus.lua toggles the whole /space\..*/ group
   local space = sbar.add("item", "space." .. i, {
     drawing = false,
     icon = {
       font = { family = settings.font.numbers },
-      string = i,
+      string = key,
       padding_left = 12,
       padding_right = 8,
       color = colors.grey,
@@ -39,7 +43,7 @@ for i = 1, WORKSPACE_COUNT, 1 do
       height = 26,
       border_color = colors.black,
     },
-    click_script = "aerospace workspace " .. i,
+    click_script = "aerospace workspace " .. key,
   })
 
   spaces[i] = space
@@ -75,13 +79,13 @@ local function update_spaces(focused)
       end
     end
 
-    for i = 1, WORKSPACE_COUNT, 1 do
-      local key = tostring(i)
+    for i, key in ipairs(WORKSPACES) do
       local selected = (key == focused)
       local occupied = icon_lines[key] ~= nil
+      -- Only occupied or focused workspaces get an icon; an empty, unfocused
+      -- one is dropped entirely instead of sitting there dimmed.
+      local shown = occupied or selected
 
-      -- All ten stay visible so the row never shifts position. Empty ones are
-      -- dimmed rather than hidden, so the occupied ones read at a glance.
       -- `highlight` overrides these colours with the *_highlight values when
       -- the workspace is focused.
       local icon_color = occupied and colors.white or colors.with_alpha(colors.grey, 0.5)
@@ -94,7 +98,7 @@ local function update_spaces(focused)
       end
 
       spaces[i]:set({
-        drawing = true,
+        drawing = shown,
         icon = { highlight = selected, color = icon_color },
         label = {
           highlight = selected,
@@ -107,10 +111,10 @@ local function update_spaces(focused)
         },
       })
       brackets[i]:set({
-        drawing = true,
+        drawing = shown,
         background = { border_color = border },
       })
-      sbar.set("space.padding." .. i, { drawing = true })
+      sbar.set("space.padding." .. i, { drawing = shown })
     end
   end)
 end

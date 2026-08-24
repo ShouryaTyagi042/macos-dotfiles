@@ -20,7 +20,11 @@ after-startup-command = [
   # entirely, so passing them here would make the winning config depend on which process
   # started first. All border styling lives in bordersrc.
   'exec-and-forget borders',
-  'exec-and-forget sketchybar --reload'
+  'exec-and-forget sketchybar --reload',
+  # Cursor is Electron: on-window-detected fires before the window has a title,
+  # so new windows land in workspace Z and this watcher moves them on once the
+  # title resolves. See .config/aerospace/sort-cursor.sh.
+  'exec-and-forget $HOME/.config/aerospace/sort-cursor.sh --watch'
 ]
 
 # Notify Sketchybar about workspace change
@@ -154,6 +158,13 @@ alt-shift-minus = 'resize smart -50'
 alt-shift-equal = 'resize smart +50'
 alt-shift-c = 'reload-config'
 
+# Re-sort every Cursor window into its repo workspace (see sort-cursor.sh)
+alt-shift-r = 'exec-and-forget $HOME/.config/aerospace/sort-cursor.sh'
+
+# Repo workspaces live behind a mode so they don't collide with the
+# alt-<letter> app launchers above. alt-w, then the repo letter.
+alt-w = 'mode code'
+
 # See: https://nikitabobko.github.io/AeroSpace/commands#workspace
 alt-1 = 'workspace 1'
 alt-2 = 'workspace 2'
@@ -250,11 +261,21 @@ run = 'move-node-to-workspace 1'
 if.app-id = 'company.thebrowser.Browser'
 run = 'move-node-to-workspace 2'
 
+# --- Cursor: one workspace per repo -------------------------------------
+# Cursor is Electron: AeroSpace detects the window BEFORE it has any title, so
+# a per-repo `if.window-title-regex-substring` rule here can never match on
+# first open (verified -- every repo landed in the catch-all). So every Cursor
+# window goes to Z, and the sort-cursor.sh --watch daemon started in
+# after-startup-command moves it to its repo workspace ~2s later, once the
+# title resolves. The repo -> workspace map lives in
+# ~/.config/aerospace/repos.conf; edit that, not this file.
+#
+# The daemon only ever moves windows still sitting in Z, so if you drag a
+# window somewhere by hand it stays put. alt-shift-r forces a full re-sort.
+
 [[on-window-detected]]
 if.app-id = 'com.todesktop.230313mzl4w4u92'
-run = 'move-node-to-workspace 3'
-
-
+run = 'move-node-to-workspace Z'
 
 [[on-window-detected]]
 if.app-id = 'ru.keepcoder.Telegram'
@@ -267,3 +288,18 @@ run = 'move-node-to-workspace 9'
 [[on-window-detected]]
 if.app-id = 'com.loom.desktop'
 run = 'layout floating'
+# 'code' binding mode: alt-w then a letter jumps to that repo's workspace,
+# shift+letter throws the focused window there instead. Either returns to main.
+[mode.code.binding]
+esc = 'mode main'
+enter = 'mode main'
+
+a = ['workspace A', 'mode main'] # superfone-api (+ its worktrees)
+o = ['workspace O', 'mode main'] # octopus
+c = ['workspace C', 'mode main'] # Claude Outputs
+z = ['workspace Z', 'mode main'] # overflow: everything unlisted
+
+shift-a = ['move-node-to-workspace A', 'mode main']
+shift-o = ['move-node-to-workspace O', 'mode main']
+shift-c = ['move-node-to-workspace C', 'mode main']
+shift-z = ['move-node-to-workspace Z', 'mode main']

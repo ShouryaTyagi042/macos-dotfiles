@@ -9,6 +9,7 @@ LINKS=(
   ".aerospace.toml"
   ".config/sketchybar"
   ".config/borders"
+  ".config/aerospace"
 )
 
 for rel in "${LINKS[@]}"; do
