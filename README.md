@@ -11,7 +11,6 @@ macOS window-manager setup: [AeroSpace](https://github.com/nikitabobko/AeroSpace
 | `.aerospace.toml` | `~/.aerospace.toml` | Tiling WM: layouts, keybinds, gaps, per-app workspace rules |
 | `.config/sketchybar/` | `~/.config/sketchybar/` | Status bar, Lua config via [SbarLua](https://github.com/FelixKratz/SbarLua) |
 | `.config/borders/bordersrc` | `~/.config/borders/bordersrc` | Border width + colours |
-| `.config/aerospace/` | `~/.config/aerospace/` | Per-repo Cursor window routing: `repos.conf` map + `sort-cursor.sh` daemon |
 
 Compiled helper binaries (`helpers/*/bin/`) are gitignored — SketchyBar rebuilds them on
 startup via `helpers/init.lua`, which shells out to `make`.
@@ -59,8 +58,6 @@ with both normalizations on — the tree stays shallow and auto-alternates H/V.
 | `alt-backtick` | Toggle between current and previous workspace |
 | `alt-shift-tab` | Move workspace to next monitor |
 | `alt-shift-c` | Reload config |
-| `alt-shift-r` | Force a full re-sort of Cursor windows into repo workspaces |
-| `alt-w` then a letter | Jump to a repo workspace · add `shift` to move the window there |
 | `alt-shift-;` | Enter service mode |
 
 Service mode (`esc` to leave): `r` reset layout · `f` toggle floating/tiling ·
@@ -70,49 +67,8 @@ App launchers: `alt-enter` Warp · `alt-a` Arc · `alt-c` Cursor · `alt-s` Slac
 `alt-n` Notion · `alt-p` Postman · `alt-m` Spotify · `alt-d` pgAdmin 4 ·
 `alt-o` MongoDB Compass.
 
-Auto-placement: wezterm + Warp → 1, Arc → 2, Telegram + WhatsApp → 9, Loom → floating.
-Cursor gets its own scheme, below.
-
-### One workspace per repo (Cursor)
-
-Working across ~20 repos, a single Cursor workspace is unusable. Each repo gets its own
-named workspace instead, reached with `alt-w` + a letter:
-
-| Keys | Repo |
-| --- | --- |
-| `alt-w a` | superfone-api (incl. its worktrees) |
-| `alt-w o` | octopus |
-| `alt-w c` | Claude Outputs |
-| `alt-w z` | overflow — every unlisted repo |
-
-`shift` + the letter throws the focused window there instead. The mode is there so repo
-letters don't collide with the `alt-<letter>` app launchers.
-
-**Why it needs a daemon.** Cursor is Electron, and AeroSpace detects the window *before*
-it has any title — so a per-repo `if.window-title-regex-substring` rule in
-`.aerospace.toml` can never match on first open. Instead every Cursor window is sent to
-`Z`, and `sort-cursor.sh --watch` (started from `after-startup-command`) polls every 2s
-and moves it on once the title resolves. Cursor titles end in `— <repo-folder>`, which
-is the routing key.
-
-The daemon only ever touches windows still sitting in `Z`, so a window you've parked
-somewhere by hand is left alone. `alt-shift-r` forces a full re-sort of everything.
-
-Adding a repo means editing `.config/aerospace/repos.conf` only — one
-`<workspace> <repo-folder>` line (workspace first, so a repo name with spaces, e.g.
-"Claude Outputs", is safe as the trailing field), no `.aerospace.toml` change (unless the
-workspace is new, which also needs a binding in `[mode.code.binding]`). Check the mapping
-without moving anything:
-
-```bash
-~/.config/aerospace/sort-cursor.sh --dry
-```
-
-SketchyBar renders these too — `items/spaces.lua` iterates a `WORKSPACES` list rather
-than `1..10`. Every workspace, numbered or letter, only draws while occupied or focused —
-an empty one drops out of the bar instead of sitting there dimmed. A new workspace letter
-needs adding there
-as well.
+Auto-placement: wezterm + Warp → 1, Arc → 2, Cursor → 3, Telegram + WhatsApp → 9,
+Loom → floating.
 
 ## SketchyBar
 
