@@ -114,7 +114,7 @@ alt-a = 'exec-and-forget open -a arc'
 alt-c = 'exec-and-forget open -a cursor'
 alt-n = 'exec-and-forget open -a notion'
 alt-p = 'exec-and-forget open -a postman'
-alt-d = 'exec-and-forget open -a "pgadmin 4"'
+# alt-d = 'exec-and-forget open -a "pgadmin 4"'
 alt-o = 'exec-and-forget open -a "mongodb compass"'
 
 
